@@ -31,3 +31,24 @@ Everything starts as an **Unsaved Draft**. It reconciles up the tiers from there
 ---
 
 <sub>Licensed under Apache-2.0. The SNCF does not recommend running production on a spreadsheet. If you do, please film it.</sub>
+
+
+## Usage
+
+```bash
+sheetstor create pgdata 1024 --replicas 2   # provision a 1 GiB volume, replica factor 2
+sheetstor list                              # list volumes
+sheetstor run pgdata postgres:16            # docker run with the volume mounted at /data
+sheetstor path pgdata                       # print the host path (for your own docker -v)
+sheetstor delete pgdata                     # forget the volume (keeps data)
+sheetstor purge  pgdata                     # delete the volume AND its data (destructive)
+```
+
+Registry & data live under `SHEETSTOR_HOME` (default `~/.sheetstor`). Requires `jq` (and `docker` for `run`).
+
+## Model
+
+Each volume is a host-path directory tracked in a **Volumes registry** (`volumes.json`) with its
+size and replica factor. On a single Docker host the replicas are metadata; multi-host resync
+(DRBD/LINSTOR-style) is on the roadmap.
+

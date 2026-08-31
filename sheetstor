@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+#
+# Sheetstor — persistent volumes for Sheeternetes (our LINSTOR). Provisions host-path
+# volumes and tracks their metadata (size, replica factor, nodes) in a Volumes registry.
+# On a single Docker host the replicas are metadata; multi-host resync is on the roadmap.
+#
+#   sheetstor create <name> <sizeMiB> [--replicas N]   # provision a volume
+#   sheetstor list                                     # list volumes
+#   sheetstor path <name>                              # print host path (for docker -v)
+#   sheetstor run <name> <image> [cmd...]              # docker run with the volume mounted at /data
+#   sheetstor delete <name>                            # remove the volume record (keeps data)
+#   sheetstor purge <name>                             # remove record AND data (destructive)
+#
+# Data & registry live under SHEETSTOR_HOME (default: ~/.sheetstor). Requires bash, jq (+docker for run).
+set -euo pipefail
+HOME_DIR="${SHEETSTOR_HOME:-$HOME/.sheetstor}"
+REG="$HOME_DIR/volumes.json"
+mkdir -p "$HOME_DIR/data"
+[ -f "$REG" ] || echo '{"volumes":[]}' > "$REG"
+
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+get() { jq -r --arg n "$1" '.volumes[]|select(.name==$n)' "$REG"; }
+exists() { [ -n "$(get "$1")" ]; }
+
+cmd="${1:-list}"; shift || true
+case "$cmd" in
+  create)
+    name="${1:?usage: sheetstor create <name> <sizeMiB> [--replicas N]}"; size="${2:?sizeMiB}"; shift 2 || true
+    reps=1; while [ $# -gt 0 ]; do case "$1" in --replicas) reps="$2"; shift 2;; *) shift;; esac; done
+    exists "$name" && { echo "sheetstor: volume '$name' already exists" >&2; exit 1; }
+    dir="$HOME_DIR/data/$name"; mkdir -p "$dir"
+    tmp="$(mktemp)"
+    jq --arg n "$name" --argjson s "$size" --argjson r "$reps" --arg p "$dir" --arg t "$(now)" \
+      '.volumes += [{name:$n,size_mib:$s,replicas:$r,path:$p,bound:false,created:$t}]' "$REG" > "$tmp" && mv "$tmp" "$REG"
+    echo "created volume '$name' (${size}MiB, replicas=$reps) at $dir"
+    ;;
+  list|ls)
+    printf "%-16s %8s %8s %-6s %s\n" "NAME" "SIZE" "REPLICAS" "BOUND" "PATH"
+    jq -r '.volumes[]|[.name,(.size_mib|tostring)+"Mi",(.replicas|tostring),(.bound|tostring),.path]|@tsv' "$REG" \
+      | while IFS=$'\t' read -r n s r b p; do printf "%-16s %8s %8s %-6s %s\n" "$n" "$s" "$r" "$b" "$p"; done
+    ;;
+  path)
+    name="${1:?usage: sheetstor path <name>}"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    get "$name" | jq -r .path
+    ;;
+  run)
+    name="${1:?usage: sheetstor run <name> <image> [cmd...]}"; image="${2:?image}"; shift 2
+    exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    path="$(get "$name" | jq -r .path)"
+    tmp="$(mktemp)"; jq --arg n "$name" '(.volumes[]|select(.name==$n)).bound=true' "$REG" > "$tmp" && mv "$tmp" "$REG"
+    echo "[sheetstor] docker run -v $path:/data $image $*"
+    exec docker run --rm -v "$path:/data" "$image" "$@"
+    ;;
+  delete)
+    name="${1:?usage: sheetstor delete <name>}"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    tmp="$(mktemp)"; jq --arg n "$name" '.volumes |= map(select(.name!=$n))' "$REG" > "$tmp" && mv "$tmp" "$REG"
+    echo "deleted volume record '$name' (data kept at $HOME_DIR/data/$name)"
+    ;;
+  purge)
+    name="${1:?usage: sheetstor purge <name>}"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    tmp="$(mktemp)"; jq --arg n "$name" '.volumes |= map(select(.name!=$n))' "$REG" > "$tmp" && mv "$tmp" "$REG"
+    rm -rf "${HOME_DIR:?}/data/$name"
+    echo "purged volume '$name' and its data"
+    ;;
+  *) echo "usage: sheetstor {create|list|path|run|delete|purge}" >&2; exit 1;;
+esac
