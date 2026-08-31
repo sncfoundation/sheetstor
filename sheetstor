@@ -19,6 +19,7 @@ mkdir -p "$HOME_DIR/data"
 [ -f "$REG" ] || echo '{"volumes":[]}' > "$REG"
 
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+valid() { case "$1" in *[!A-Za-z0-9._-]*|""|.|..) echo "sheetstor: invalid volume name: '$1' (use [A-Za-z0-9._-])" >&2; exit 1;; esac; }
 get() { jq -r --arg n "$1" '.volumes[]|select(.name==$n)' "$REG"; }
 exists() { [ -n "$(get "$1")" ]; }
 
@@ -26,6 +27,7 @@ cmd="${1:-list}"; shift || true
 case "$cmd" in
   create)
     name="${1:?usage: sheetstor create <name> <sizeMiB> [--replicas N]}"; size="${2:?sizeMiB}"; shift 2 || true
+    valid "$name"
     reps=1; while [ $# -gt 0 ]; do case "$1" in --replicas) reps="$2"; shift 2;; *) shift;; esac; done
     exists "$name" && { echo "sheetstor: volume '$name' already exists" >&2; exit 1; }
     dir="$HOME_DIR/data/$name"; mkdir -p "$dir"
@@ -40,11 +42,11 @@ case "$cmd" in
       | while IFS=$'\t' read -r n s r b p; do printf "%-16s %8s %8s %-6s %s\n" "$n" "$s" "$r" "$b" "$p"; done
     ;;
   path)
-    name="${1:?usage: sheetstor path <name>}"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    name="${1:?usage: sheetstor path <name>}"; valid "$name"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
     get "$name" | jq -r .path
     ;;
   run)
-    name="${1:?usage: sheetstor run <name> <image> [cmd...]}"; image="${2:?image}"; shift 2
+    name="${1:?usage: sheetstor run <name> <image> [cmd...]}"; valid "$name"; image="${2:?image}"; shift 2
     exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
     path="$(get "$name" | jq -r .path)"
     tmp="$(mktemp)"; jq --arg n "$name" '(.volumes[]|select(.name==$n)).bound=true' "$REG" > "$tmp" && mv "$tmp" "$REG"
@@ -52,12 +54,12 @@ case "$cmd" in
     exec docker run --rm -v "$path:/data" "$image" "$@"
     ;;
   delete)
-    name="${1:?usage: sheetstor delete <name>}"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    name="${1:?usage: sheetstor delete <name>}"; valid "$name"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
     tmp="$(mktemp)"; jq --arg n "$name" '.volumes |= map(select(.name!=$n))' "$REG" > "$tmp" && mv "$tmp" "$REG"
     echo "deleted volume record '$name' (data kept at $HOME_DIR/data/$name)"
     ;;
   purge)
-    name="${1:?usage: sheetstor purge <name>}"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
+    name="${1:?usage: sheetstor purge <name>}"; valid "$name"; exists "$name" || { echo "no such volume: $name" >&2; exit 1; }
     tmp="$(mktemp)"; jq --arg n "$name" '.volumes |= map(select(.name!=$n))' "$REG" > "$tmp" && mv "$tmp" "$REG"
     rm -rf "${HOME_DIR:?}/data/$name"
     echo "purged volume '$name' and its data"
