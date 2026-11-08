@@ -9,7 +9,7 @@ A <a href="https://sncfoundation.github.io">Sheet-Native Computing Foundation</a
 
 ---
 
-**Status:** 📝 Unsaved Draft &#183; this project is a proposal. Design notes and contributions are welcome.
+**Status:** 📝 Unsaved Draft &#183; no longer just a proposal. A working prototype shipped as [v0.1.0](https://github.com/sncfoundation/sheetstor/releases/tag/v0.1.0): host-path volumes with a registry, but the registry is a local JSON file rather than a Volumes tab, and replicas are metadata only. The [tracking issue #30](https://github.com/sncfoundation/sheeternetes/issues/30) stays open until the registry moves into the Sheet.
 
 ## About
 
@@ -17,7 +17,7 @@ Distributed replicated block storage Part of the spreadsheet-native stack — th
 
 ## Get involved
 
-- 📋 Tracking issue &amp; design: [sncfoundation/sheeternetes#30](https://github.com/sncfoundation/sheeternetes/issues/30)
+- 📋 Tracking issue &amp; design: [sncfoundation/sheeternetes#30](https://github.com/sncfoundation/sheeternetes/issues/30) (open)
 - 🗺️ [SNCF Landscape](https://sncfoundation.github.io/landscape.html)
 - 🧩 [All projects](https://sncfoundation.github.io/projects.html)
 - ⚖️ [Governance &amp; how to contribute](https://github.com/sncfoundation/governance)
