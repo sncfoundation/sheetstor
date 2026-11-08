@@ -9,7 +9,7 @@ A <a href="https://sncfoundation.github.io">Sheet-Native Computing Foundation</a
 
 ---
 
-**Status:** 📝 Unsaved Draft &#183; no longer just a proposal. A working prototype shipped as [v0.1.0](https://github.com/sncfoundation/sheetstor/releases/tag/v0.1.0): host-path volumes with a registry, but the registry is a local JSON file rather than a Volumes tab, and replicas are metadata only. The [tracking issue #30](https://github.com/sncfoundation/sheeternetes/issues/30) stays open until the registry moves into the Sheet.
+**Status:** 📝 Unsaved Draft &#183; two backends. The registry now lives in the Sheet: **Sheetstor on cells** ships with Sheeternetes ([`Sheetstor.gs`](https://github.com/sncfoundation/sheeternetes/blob/master/Sheetstor.gs), [docs](https://github.com/sncfoundation/sheeternetes/blob/master/docs/script-runtime.md#sheetstor-on-cells)) — a `Volumes` tab plus one hidden tab per volume whose files are base64 chunks below the 50,000-character cell limit, sha256-verified and written copy-on-write with an atomic generation flip, with `rw`/`ro` volumes for script pods (`skctl volume create|ls|put|get|rm|delete`). This CLI ([v0.1.0](https://github.com/sncfoundation/sheetstor/releases/tag/v0.1.0)) remains the host-path backend for Docker hosts, with its registry still in a local JSON file and replicas as metadata only. [Tracking issue #30](https://github.com/sncfoundation/sheeternetes/issues/30) stays open for mounting volumes into Docker pods and replicas across spreadsheets.
 
 ## About
 
